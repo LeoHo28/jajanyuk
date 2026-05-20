@@ -21,7 +21,7 @@ class PostService {
     await _postsCollection.add(newPost);
   }
 
-  static Future<void> updatPost(Post post) async {
+  static Future<void> updatePost(Post post) async {
     Map<String, dynamic> updatedPost = {
       'image': post.image,
       'description': post.description,

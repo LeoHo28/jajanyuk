@@ -165,7 +165,7 @@ class _AddPostScreenState extends State<AddPostScreen> {
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.between,
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text('Berikan Rating:', style: TextStyle(fontWeight: FontWeight.bold)),
                     DropdownButton<double>(

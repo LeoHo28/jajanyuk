@@ -5,6 +5,7 @@ import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 import 'screens/sign_in_screen.dart';
 
+
 void main() async {
   // Memastikan binding Flutter sudah siap sebelum inisialisasi Firebase
   WidgetsFlutterBinding.ensureInitialized();
@@ -28,7 +29,7 @@ class MyApp extends StatelessWidget {
       
       // Mengatur Tema Warna Aplikasi biar bernuansa Kuliner (Deep Orange)
       theme: ThemeData(
-        useMaterialDesign: true,
+        useMaterial3: true,
         primarySwatch: Colors.deepOrange,
         colorScheme: ColorScheme.fromSeed(
           seedColor: Colors.deepOrange,
