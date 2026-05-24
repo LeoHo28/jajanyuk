@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'add_post_screen.dart';
+import 'profile_screen.dart'; 
 import 'sign_in_screen.dart';
 import '../service/post_service.dart';
 import '../widget/post_list_item.dart';
@@ -33,10 +34,11 @@ class _HomeScreenState extends State<HomeScreen> {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Food Review Tracker"),
+        title: const Text("Jajanyuk - Food Review Tracker"),
         backgroundColor: Colors.deepOrange,
         foregroundColor: Colors.white,
         actions: [
+          // Tombol logout tetap dipertahankan sebagai alternatif cepat
           IconButton(
             onPressed: signOut,
             icon: const Icon(Icons.logout),
@@ -47,19 +49,41 @@ class _HomeScreenState extends State<HomeScreen> {
       body: Column(
         children: [
           const SizedBox(height: 16.0),
-          CircleAvatar(
-            radius: 40,
-            backgroundImage: NetworkImage(
-              generateAvatarUrl(FirebaseAuth.instance.currentUser?.displayName),
+          
+          
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              );
+            },
+            borderRadius: BorderRadius.circular(40),
+            child: CircleAvatar(
+              radius: 40,
+              backgroundImage: NetworkImage(
+                generateAvatarUrl(FirebaseAuth.instance.currentUser?.displayName),
+              ),
             ),
           ),
+          
           const SizedBox(height: 8.0),
           Text(
             FirebaseAuth.instance.currentUser?.displayName ?? 'Foodies',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 4.0),
+          
+          // Petunjuk kecil interaktif untuk pengguna
+          Text(
+            'Ketuk foto profil untuk detail akun',
+            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
+          ),
+          
           const SizedBox(height: 12.0),
           const Divider(height: 1),
+          
+          // Bagian List Review Kuliner
           Expanded(
             child: StreamBuilder(
               stream: PostService.getPostList(),
