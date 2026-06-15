@@ -1,71 +1,101 @@
-import 'package:jajanyuk/model/post.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../model/post.dart';
 
 class PostService {
-  static final FirebaseFirestore _database = FirebaseFirestore.instance;
-  static final CollectionReference _postsCollection = _database.collection('posts');
+  static final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  static Future<void> addPost(Post post) async {
-    Map<String, dynamic> newPost = {
-      'image': post.image,
-      'description': post.description,
-      'category': post.category,
-      'rating': post.rating,
-      'latitude': post.latitude,
-      'longitude': post.longitude,
-      'created_at': FieldValue.serverTimestamp(),
-      'updated_at': FieldValue.serverTimestamp(),
-      'user_id': post.userId,
-      'user_full_name': post.userFullName,
-    };
-    await _postsCollection.add(newPost);
+  static Stream<List<Post>> getPostList() {
+    return _db.collection('posts').snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return Post.fromMap(doc.data(), doc.id);
+      }).toList();
+    });
   }
 
-  static Future<void> updatePost(Post post) async {
-    Map<String, dynamic> updatedPost = {
-      'image': post.image,
-      'description': post.description,
-      'category': post.category,
-      'rating': post.rating,
-      'latitude': post.latitude,
-      'longitude': post.longitude,
-      'created_at': post.createdAt,
-      'updated_at': FieldValue.serverTimestamp(),
-      'user_id': post.userId,
-      'user_full_name': post.userFullName,
-    };
-    await _postsCollection.doc(post.id).update(updatedPost);
+  static Future<void> addPost(Post post) async {
+    await _db.collection('posts').add(post.toMap());
   }
 
   static Future<void> deletePost(Post post) async {
-    await _postsCollection.doc(post.id).delete();
+    if (post.id != null) {
+      await _db.collection('posts').doc(post.id).delete();
+    }
   }
 
-  static Future<QuerySnapshot> retrievePost() {
-    return _postsCollection.get();
+  static Future<void> toggleFavoritePost(String postId, String userId, bool isFavorite) async {
+    final postRef = _db.collection('posts').doc(postId);
+    if (isFavorite) {
+      await postRef.update({
+        'likedBy': FieldValue.arrayUnion([userId])
+      });
+    } else {
+      await postRef.update({
+        'likedBy': FieldValue.arrayRemove([userId])
+      });
+    }
   }
 
-  static Stream<List<Post>> getPostList() {
-    return _postsCollection
-        .orderBy('created_at', descending: true)
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs.map((doc) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        return Post(
-          id: doc.id,
-          image: data['image'],
-          description: data['description'],
-          category: data['category'],
-          rating: data['rating'] != null ? (data['rating'] as num).toDouble() : 5.0,
-          createdAt: data['created_at'] != null ? data['created_at'] as Timestamp : null,
-          updatedAt: data['updated_at'] != null ? data['updated_at'] as Timestamp : null,
-          latitude: data['latitude'],
-          longitude: data['longitude'],
-          userId: data['user_id'],
-          userFullName: data['user_full_name'],
-        );
-      }).toList();
+  // ==================== FITUR MULTI-USER RATING UPDATE KAMI ====================
+
+  // Mendapatkan rating yang pernah diberikan user saat ini pada kuliner terkait
+  static Future<int?> getUserRating(String postId) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return null;
+
+    final doc = await _db
+        .collection('posts')
+        .doc(postId)
+        .collection('ratings')
+        .doc(uid)
+        .get();
+
+    if (doc.exists) {
+      return doc.data()?['rating'] as int?;
+    }
+    return null;
+  }
+
+  // Menambahkan ulasan baru ATAU memperbarui ulasan rating lama secara dinamis
+  static Future<void> addRating(String postId, int selectedRating) async {
+    final uid = _auth.currentUser?.uid;
+    if (uid == null) return;
+
+    final postRef = _db.collection('posts').doc(postId);
+    final ratingRef = postRef.collection('ratings').doc(uid);
+
+    await _db.runTransaction((transaction) async {
+      final postDoc = await transaction.get(postRef);
+      final ratingDoc = await transaction.get(ratingRef);
+
+      if (!postDoc.exists) return;
+
+      double currentSum = (postDoc.data()?['ratingSum'] as num?)?.toDouble() ?? 0.0;
+      int currentCount = (postDoc.data()?['ratingCount'] as int?) ?? 0;
+
+      if (ratingDoc.exists) {
+        // Jika UPDATE: rating lama dikurangi, rating baru ditambahkan ke akumulasi sum
+        int oldRating = ratingDoc.data()?['rating'] as int;
+        double newSum = currentSum - oldRating + selectedRating;
+
+        transaction.update(postRef, {'ratingSum': newSum});
+      } else {
+        // Jika BARU: tambahkan jumlah pengulas baru (Count + 1)
+        double newSum = currentSum + selectedRating;
+        int newCount = currentCount + 1;
+
+        transaction.update(postRef, {
+          'ratingSum': newSum,
+          'ratingCount': newCount,
+        });
+      }
+
+      // Simpan/Selesaikan data rating user di sub-collection
+      transaction.set(ratingRef, {
+        'rating': selectedRating,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     });
   }
 }

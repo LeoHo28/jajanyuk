@@ -12,8 +12,29 @@ class ProfileScreen extends StatefulWidget {
 
 class _ProfileScreenState extends State<ProfileScreen> {
   final User? currentUser = FirebaseAuth.instance.currentUser;
+  final _nameController = TextEditingController();
+  final _passwordController = TextEditingController();
 
-  Future<void> _signOut() async {
+  @override
+  void initState() {
+    super.initState();
+    // Mengisi nama awal di textfield sesuai data user login
+    _nameController.text = currentUser?.displayName ?? '';
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  String _generateAvatarUrl(String? fullName) {
+    final formattedName = (fullName ?? 'User').trim().replaceAll(' ', '+');
+    return 'https://ui-avatars.com/api/?name=$formattedName&color=FFFFFF&background=FF5722&size=158';
+  }
+
+  Future<void> _processLogout() async {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
     Navigator.pushAndRemoveUntil(
@@ -23,24 +44,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  String _generateAvatarUrl(String? fullName) {
-    final formattedName = (fullName ?? 'User').trim().replaceAll(' ', '+');
-    return 'https://ui-avatars.com/api/?name=$formattedName&color=FFFFFF&background=FF5722&size=158';
+  // Fungsi untuk update Nama Profil di Firebase Auth
+  Future<void> _updateProfileName() async {
+    if (_nameController.text.trim().isEmpty) return;
+
+    try {
+      await currentUser?.updateDisplayName(_nameController.text.trim());
+      await currentUser?.reload(); // Reload agar data terbaru masuk
+      
+      if (!mounted) return;
+      Navigator.pop(context); // Tutup bottom sheet
+      setState(() {}); // Segarkan tampilan UI profil
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Nama berhasil diperbarui!'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal memperbarui nama: $e'), backgroundColor: Colors.red),
+      );
+    }
+  }
+
+  // Fungsi untuk update Password di Firebase Auth
+  Future<void> _updatePassword() async {
+    if (_passwordController.text.trim().length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password minimal harus 6 karakter!'), backgroundColor: Colors.amber),
+      );
+      return;
+    }
+
+    try {
+      await currentUser?.updatePassword(_passwordController.text.trim());
+      
+      if (!mounted) return;
+      Navigator.pop(context); // Tutup bottom sheet
+      _passwordController.clear();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password berhasil diubah!'), backgroundColor: Colors.green),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal mengubah password (perlu login ulang): $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Profil Foodies"),
-        backgroundColor: Colors.deepOrange,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
       body: SingleChildScrollView(
         child: Column(
           children: [
-            // Bagian Header Profil (Warna Oranye Estetik)
+            // Bagian Header Profil
             Container(
               width: double.infinity,
               decoration: const BoxDecoration(
@@ -50,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   bottomRight: Radius.circular(32),
                 ),
               ),
-              padding: const EdgeInsets.only(bottom: 32.0, top: 16.0),
+              padding: const EdgeInsets.only(bottom: 32.0, top: 24.0),
               child: Column(
                 children: [
                   CircleAvatar(
@@ -59,13 +117,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: CircleAvatar(
                       radius: 50,
                       backgroundImage: NetworkImage(
-                        _generateAvatarUrl(currentUser?.displayName),
+                        _generateAvatarUrl(FirebaseAuth.instance.currentUser?.displayName),
                       ),
                     ),
                   ),
                   const SizedBox(height: 16.0),
                   Text(
-                    currentUser?.displayName ?? 'Foodies',
+                    FirebaseAuth.instance.currentUser?.displayName ?? 'Foodies',
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -94,7 +152,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 builder: (context, snapshot) {
                   int totalReviews = 0;
                   if (snapshot.hasData && currentUser != null) {
-                    // Menghitung jumlah post milik user yang sedang login
                     totalReviews = snapshot.data!
                         .where((post) => post.userId == currentUser!.uid)
                         .length;
@@ -135,19 +192,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
             const SizedBox(height: 24.0),
 
-            // Tombol Aksi / Menu
+            // Tombol Aksi / Menu Pengaturan Akun
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0),
               child: Column(
                 children: [
                   ListTile(
-                    leading: const Icon(Icons.restaurant, color: Colors.deepOrange),
-                    title: const Text('Review Saya'),
-                    subtitle: const Text('Lihat semua kuliner yang kamu ulas'),
+                    leading: const Icon(Icons.edit, color: Colors.deepOrange),
+                    title: const Text('Ubah Nama Profil'),
+                    subtitle: const Text('Ganti nama panggilah akun makananmu'),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      // Opsional: Bisa diarahkan ke list khusus review user
-                    },
+                    onTap: () => _showEditNameSheet(),
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: const Icon(Icons.lock, color: Colors.deepOrange),
+                    title: const Text('Ganti Password'),
+                    subtitle: const Text('Amankan akunmu secara berkala'),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => _showEditPasswordSheet(),
                   ),
                   const Divider(),
                   ListTile(
@@ -183,6 +246,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  // Sheet Pengeditan Nama Lengkap
+  void _showEditNameSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 16, right: 16, top: 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Ubah Nama Lengkap', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Nama Baru',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.person),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _updateProfileName,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+              child: const Text('Simpan Perubahan'),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Sheet Pengubahan Sandi Akun
+  void _showEditPasswordSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 16, right: 16, top: 24,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Ganti Kata Sandi', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Password Baru',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.lock),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _updatePassword,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.deepOrange, foregroundColor: Colors.white),
+              child: const Text('Update Password'),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showLogoutDialog() {
     showDialog(
       context: context,
@@ -194,6 +332,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: const Text('Batal', style: TextStyle(color: Colors.grey)),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _processLogout();
+              },
+              child: const Text('Keluar', style: TextStyle(color: Colors.red)),
             ),
           ],
         );

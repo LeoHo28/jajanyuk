@@ -15,7 +15,8 @@ class PostListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    double foodRating = post.rating ?? 5.0;
+    // Mengambil nilai getter rata-rata rating dari model Post
+    double foodRating = post.averageRating;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -63,6 +64,7 @@ class PostListItem extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Row(
+                        mainAxisSize: MainAxisSize.min,
                         children: [
                           const Icon(Icons.star, color: Colors.amber, size: 16),
                           const SizedBox(width: 4),
@@ -74,6 +76,12 @@ class PostListItem extends StatelessWidget {
                               fontSize: 12,
                             ),
                           ),
+                          if (post.ratingCount != null && post.ratingCount! > 0) ...[
+                            Text(
+                              ' (${post.ratingCount})',
+                              style: const TextStyle(color: Colors.white70, fontSize: 10),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -85,24 +93,29 @@ class PostListItem extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Row Atas: Kategori & Status Pemilik (Aman dari overflow)
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       if (post.category != null)
-                        Chip(
-                          label: Text(
-                            post.category!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.deepOrange,
+                        Flexible(
+                          child: Chip(
+                            label: Text(
+                              post.category!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.deepOrange,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            backgroundColor: Colors.deepOrange.shade50,
+                            side: BorderSide.none,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          backgroundColor: Colors.deepOrange.shade50,
-                          side: BorderSide.none,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         ),
+                      const SizedBox(width: 8),
                       if (isOwner)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -127,21 +140,29 @@ class PostListItem extends StatelessWidget {
                   const SizedBox(height: 14),
                   const Divider(height: 1),
                   const SizedBox(height: 10),
+                  // Row Bawah: Nama User & Tombol Lokasi Resto
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.account_circle, size: 16, color: Colors.grey),
-                          const SizedBox(width: 6),
-                          Text(
-                            post.userFullName ?? 'Gourmet User',
-                            style: const TextStyle(fontSize: 12, color: Colors.grey),
-                          ),
-                        ],
+                      Expanded(
+                        child: Row(
+                          children: [
+                            const Icon(Icons.account_circle, size: 16, color: Colors.grey),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                post.userFullName ?? 'Gourmet User',
+                                style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       if (post.latitude != null && post.longitude != null)
                         Row(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(Icons.restaurant_menu, size: 14, color: Colors.deepOrangeAccent),
                             const SizedBox(width: 4),

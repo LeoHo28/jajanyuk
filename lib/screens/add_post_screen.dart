@@ -208,16 +208,20 @@ class _AddPostScreenState extends State<AddPostScreen> {
                 setState(() => _isSubmitting = true);
                 try {
                   if (_latitude == null) await _getLocation();
+                  
                   await PostService.addPost(Post(
                     image: _base64Image,
                     description: _descriptionController.text,
                     category: _category,
-                    rating: _selectedRating,
+                    ratingSum: _selectedRating, 
+                    ratingCount: 1,            
                     latitude: _latitude,
                     longitude: _longitude,
                     userId: FirebaseAuth.instance.currentUser?.uid,
                     userFullName: FirebaseAuth.instance.currentUser?.displayName,
+                    likedBy: const [],         
                   ));
+                  
                   if (mounted) Navigator.pop(context);
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Gagal: $e')));

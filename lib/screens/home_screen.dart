@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'add_post_screen.dart';
+import 'favorite_screen.dart'; 
 import 'profile_screen.dart'; 
 import 'sign_in_screen.dart';
 import '../service/post_service.dart';
@@ -14,6 +15,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _currentIndex = 0;
+
   Future<void> signOut() async {
     await FirebaseAuth.instance.signOut();
     if (!mounted) return;
@@ -24,66 +27,51 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  String generateAvatarUrl(String? fullName) {
-    final formattedName = (fullName ?? 'User').trim().replaceAll(' ', '+');
-    return 'https://ui-avatars.com/api/?name=$formattedName&color=FFFFFF&background=FF5722';
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  // Desain Beranda Utama yang Menarik & Aman dari Overflow
+  Widget _buildHomeDashboard() {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("Jajanyuk - Food Review Tracker"),
-        backgroundColor: Colors.deepOrange,
-        foregroundColor: Colors.white,
-        actions: [
-          // Tombol logout tetap dipertahankan sebagai alternatif cepat
-          IconButton(
-            onPressed: signOut,
-            icon: const Icon(Icons.logout),
-            tooltip: "Keluar",
-          ),
-        ],
-      ),
-      body: Column(
+    final userName = FirebaseAuth.instance.currentUser?.displayName ?? 'Foodies';
+
+    return Container(
+      color: Colors.grey.shade50,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 16.0),
-          
-          
-          InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const ProfileScreen()),
-              );
-            },
-            borderRadius: BorderRadius.circular(40),
-            child: CircleAvatar(
-              radius: 40,
-              backgroundImage: NetworkImage(
-                generateAvatarUrl(FirebaseAuth.instance.currentUser?.displayName),
+          // Banner Sapaan Pengguna Modern
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20.0),
+            decoration: const BoxDecoration(
+              color: Colors.deepOrange,
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(24),
+                bottomRight: Radius.circular(24),
               ),
             ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Halo, $userName! 👋",
+                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  "Mau berburu kuliner apa hari ini?",
+                  style: TextStyle(fontSize: 14, color: Colors.orange.shade100),
+                ),
+              ],
+            ),
           ),
-          
-          const SizedBox(height: 8.0),
-          Text(
-            FirebaseAuth.instance.currentUser?.displayName ?? 'Foodies',
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+
+          const Padding(
+            padding: EdgeInsets.only(left: 16.0, top: 20.0, bottom: 8.0),
+            child: Text(
+              "Penjelajahan Kuliner Terbaru",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+            ),
           ),
-          const SizedBox(height: 4.0),
-          
-          // Petunjuk kecil interaktif untuk pengguna
-          Text(
-            'Ketuk foto profil untuk detail akun',
-            style: TextStyle(fontSize: 12, color: Colors.grey.shade500),
-          ),
-          
-          const SizedBox(height: 12.0),
-          const Divider(height: 1),
-          
-          // Bagian List Review Kuliner
+
           Expanded(
             child: StreamBuilder(
               stream: PostService.getPostList(),
@@ -98,16 +86,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (posts.isEmpty) {
                   return const Center(child: Text('Belum ada review kuliner.'));
                 }
+                
                 return RefreshIndicator(
                   onRefresh: () async {
                     setState(() {});
                   },
+                  // Menggunakan ListView vertikal agar pas dengan komponen PostListItem bawaanmu
                   child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
                     itemCount: posts.length,
                     itemBuilder: (context, index) {
                       final post = posts[index];
                       final isOwner = currentUserId != null && post.userId == currentUserId;
-                      return PostListItem(post: post, isOwner: isOwner);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: PostListItem(post: post, isOwner: isOwner),
+                      );
                     },
                   ),
                 );
@@ -116,15 +110,61 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(builder: (context) => const AddPostScreen()),
-          );
-        },
+    );
+  }
+
+  List<Widget> _buildBodyWidgets() {
+    return [
+      _buildHomeDashboard(),
+      const FavoriteScreen(),
+      const Center(child: CircularProgressIndicator()), // Placeholder transisi
+      const ProfileScreen(),
+    ];
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("Jajanyuk", style: TextStyle(fontWeight: FontWeight.bold)),
         backgroundColor: Colors.deepOrange,
         foregroundColor: Colors.white,
-        child: const Icon(Icons.add_comment),
+        elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: signOut,
+            icon: const Icon(Icons.logout),
+            tooltip: "Keluar",
+          ),
+        ],
+      ),
+      body: _currentIndex == 2 
+          ? const Center(child: CircularProgressIndicator()) 
+          : _buildBodyWidgets()[_currentIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _currentIndex,
+        selectedItemColor: Colors.deepOrange,
+        unselectedItemColor: Colors.grey,
+        type: BottomNavigationBarType.fixed,
+        backgroundColor: Colors.white,
+        elevation: 15,
+        onTap: (index) {
+          if (index == 2) {
+            Navigator.of(context).push(
+              MaterialPageRoute(builder: (context) => const AddPostScreen()),
+            );
+          } else {
+            setState(() {
+              _currentIndex = index;
+            });
+          }
+        },
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Beranda'),
+          BottomNavigationBarItem(icon: Icon(Icons.bookmark_rounded), label: 'Favorit'),
+          BottomNavigationBarItem(icon: Icon(Icons.add_circle, size: 32), label: 'Tambah'),
+          BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profil'),
+        ],
       ),
     );
   }
