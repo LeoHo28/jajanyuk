@@ -9,7 +9,8 @@ class PostService {
   static Stream<List<Post>> getPostList() {
     return _db.collection('posts').snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
-        return Post.fromMap(doc.data(), doc.id);
+        final data = doc.data(); 
+        return Post.fromMap(data, doc.id);
       }).toList();
     });
   }

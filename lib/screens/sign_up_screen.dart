@@ -40,29 +40,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
 
     try {
-      UserCredential userCredential = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(
-            email: _emailController.text.trim(),
-            password: _passwordController.text.trim(),
-          );
-      
-      // Menggunakan await agar display name selesai terdaftar di Firebase
-      await userCredential.user?.updateDisplayName(_nameController.text.trim());
+      // 1. Daftarkan email dan password
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: _emailController.text.trim(),
+        password: _passwordController.text.trim(),
+      );
 
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Registrasi Berhasil! Silakan Masuk.')),
-        );
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const SignInScreen()),
-        );
+      // 2. Ambil user yang baru saja login otomatis setelah daftar
+      User? currentUser = FirebaseAuth.instance.currentUser;
+
+      // 3. 💡 SOLUSI AMAN: Paksa update nama ke Firebase Auth sebelum pindah halaman
+      if (currentUser != null) {
+        await currentUser.updateDisplayName(_nameController.text.trim());
+        await currentUser.reload(); // Memaksa Firebase memperbarui data lokal aplikasi
       }
-    } on FirebaseAuthException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal Mendaftar: ${e.message}')),
-        );
-      }
+
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Registrasi Berhasil! Silakan Masuk.')),
+      );
+      
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => const SignInScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Gagal: $e')),
+      );
     } finally {
       if (mounted) {
         setState(() {

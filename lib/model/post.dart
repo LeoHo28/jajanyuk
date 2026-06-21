@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 class Post {
   final String? id;
   final String? image;
@@ -5,8 +7,8 @@ class Post {
   final String? category;
   final double? ratingSum;   
   final int? ratingCount;    
-  final String? createdAt;
-  final String? updatedAt;
+  final DateTime? createdAt; // 👈 Diubah menjadi DateTime agar fleksibel
+  final DateTime? updatedAt; // 👈 Diubah menjadi DateTime
   final double? latitude;
   final double? longitude;
   final String? userId;
@@ -51,6 +53,14 @@ class Post {
       return null;
     }
 
+    // Fungsi pembantu untuk konversi Timestamp Firebase ke DateTime Flutter
+    DateTime? _parseDateTime(dynamic v) {
+      if (v == null) return null;
+      if (v is Timestamp) return v.toDate();
+      if (v is String) return DateTime.tryParse(v);
+      return null;
+    }
+
     return Post(
       id: id,
       image: map['image'],
@@ -58,8 +68,8 @@ class Post {
       category: map['category'],
       ratingSum: _parseDouble(map['ratingSum']) ?? 0.0,
       ratingCount: _parseInt(map['ratingCount']) ?? 0,
-      createdAt: map['createdAt'],
-      updatedAt: map['updatedAt'],
+      createdAt: _parseDateTime(map['createdAt']), // 👈 parsing aman dari Timestamp
+      updatedAt: _parseDateTime(map['updatedAt']),
       latitude: _parseDouble(map['latitude']),
       longitude: _parseDouble(map['longitude']),
       userId: map['userId'],
@@ -75,8 +85,9 @@ class Post {
       'category': category,
       'ratingSum': ratingSum,
       'ratingCount': ratingCount,
-      'createdAt': createdAt,
-      'updatedAt': updatedAt,
+      // 👈 Jika bernilai null, server otomatis mengisi dengan serverTimestamp() waktu Firebase
+      'createdAt': createdAt != null ? Timestamp.fromDate(createdAt!) : FieldValue.serverTimestamp(),
+      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : FieldValue.serverTimestamp(),
       'latitude': latitude,
       'longitude': longitude,
       'userId': userId,

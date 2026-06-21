@@ -232,8 +232,10 @@ class _AddPostScreenState extends State<AddPostScreen> {
                     latitude: _latitude,
                     longitude: _longitude,
                     userId: FirebaseAuth.instance.currentUser?.uid,
-                    userFullName: FirebaseAuth.instance.currentUser?.displayName,
-                    likedBy: const [],         
+                    userFullName: FirebaseAuth.instance.currentUser?.displayName?? 'Gourmet User',
+                    likedBy: const [],
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),         
                   ));
                   await NotificationService.showReviewNotification(
                     title: 'Review terkirim',
