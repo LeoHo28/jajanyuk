@@ -3,12 +3,12 @@ class Post {
   final String? image;
   final String? description;
   final String? category;
-  final double? ratingSum;   // Menyimpan total penjumlahan bintang
-  final int? ratingCount;    // Menyimpan total jumlah pengulas
+  final double? ratingSum;   
+  final int? ratingCount;    
   final String? createdAt;
   final String? updatedAt;
-  final String? latitude;
-  final String? longitude;
+  final double? latitude;
+  final double? longitude;
   final String? userId;
   final String? userFullName;
   final List<dynamic>? likedBy;
@@ -36,17 +36,32 @@ class Post {
   }
 
   factory Post.fromMap(Map<String, dynamic> map, String id) {
+    double? _parseDouble(dynamic v) {
+      if (v == null) return null;
+      if (v is num) return v.toDouble();
+      if (v is String) return double.tryParse(v);
+      return null;
+    }
+
+    int? _parseInt(dynamic v) {
+      if (v == null) return null;
+      if (v is int) return v;
+      if (v is num) return v.toInt();
+      if (v is String) return int.tryParse(v);
+      return null;
+    }
+
     return Post(
       id: id,
       image: map['image'],
       description: map['description'],
       category: map['category'],
-      ratingSum: (map['ratingSum'] as num?)?.toDouble() ?? 0.0,
-      ratingCount: map['ratingCount'] as int? ?? 0,
+      ratingSum: _parseDouble(map['ratingSum']) ?? 0.0,
+      ratingCount: _parseInt(map['ratingCount']) ?? 0,
       createdAt: map['createdAt'],
       updatedAt: map['updatedAt'],
-      latitude: map['latitude'],
-      longitude: map['longitude'],
+      latitude: _parseDouble(map['latitude']),
+      longitude: _parseDouble(map['longitude']),
       userId: map['userId'],
       userFullName: map['userFullName'],
       likedBy: map['likedBy'],

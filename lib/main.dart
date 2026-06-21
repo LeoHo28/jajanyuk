@@ -4,16 +4,15 @@ import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 import 'screens/sign_in_screen.dart';
+import 'service/notification_service.dart';
 
 
 void main() async {
-  // Memastikan binding Flutter sudah siap sebelum inisialisasi Firebase
   WidgetsFlutterBinding.ensureInitialized();
-  
-  // Inisialisasi Firebase dengan opsi platform saat ini (Android/iOS/Web)
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await NotificationService.initialize();
 
   runApp(const MyApp());
 }
@@ -24,7 +23,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Food Review Tracker',
+      title: 'JajanYuk',
       debugShowCheckedModeBanner: false,
       
       // Mengatur Tema Warna Aplikasi biar bernuansa Kuliner (Deep Orange)

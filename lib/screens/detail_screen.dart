@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 import '../model/post.dart';
 import '../service/post_service.dart';
 import 'map_detail_screen.dart';
+import '../widget/comment_bottom_sheet.dart';
 
 class DetailScreen extends StatefulWidget {
   final Post post;
@@ -20,6 +23,15 @@ class _DetailScreenState extends State<DetailScreen> {
   
   late double _displayRating;
   late int _displayCount;
+
+  Uint8List? _decodeBase64Image(String? image) {
+    if (image == null || image.isEmpty) return null;
+    try {
+      return base64Decode(image);
+    } catch (_) {
+      return null;
+    }
+  }
 
   @override
   void initState() {
@@ -99,20 +111,20 @@ class _DetailScreenState extends State<DetailScreen> {
     SharePlus.instance.share(ShareParams(text: text));
   }
 
-  // Fungsi untuk menyegarkan tampilan total ulasan di UI lokal setelah proses kirim/update
-  Future<void> _refreshUIData() async {
-    int? currentSavedUserRating = await PostService.getUserRating(widget.post.id!);
-    
-    // Perhitungan lokal untuk update state tampilan tanpa perlu reload penuh screen
-    setState(() {
-      if (_displayCount == 0) _displayCount = 1;
-      // Mengingat data di Firestore ter-update via transaksi, cara paling valid adalah memperbarui UI
-      // secara berkala atau mengambil snapshot terbaru dari post id yang dimuat.
-    });
+  void _showCommentBottomSheet() {
+    if (widget.post.id == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => CommentBottomSheet(
+        postId: widget.post.id!,
+        postOwnerId: widget.post.userId, // BERHASIL DI-OPER KE SINI!
+      ),
+    );
   }
 
   void _showRatingDialog() async {
-    // Tampilkan loading indicator pelan saat mengambil data lama dari Firestore
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -125,7 +137,7 @@ class _DetailScreenState extends State<DetailScreen> {
     }
 
     if (!mounted) return;
-    Navigator.pop(context); // Tutup loading indicator awal
+    Navigator.pop(context);
 
     int selectedRating = existingRating ?? 5;
     final bool hasRated = existingRating != null;
@@ -182,7 +194,6 @@ class _DetailScreenState extends State<DetailScreen> {
                     if (widget.post.id != null) {
                       final messenger = ScaffoldMessenger.of(context);
                       
-                      // Logika pembaharuan nilai UI instan secara lokal
                       setState(() {
                         if (hasRated) {
                           double oldSum = (_displayRating * _displayCount) - existingRating! + selectedRating;
@@ -222,6 +233,7 @@ class _DetailScreenState extends State<DetailScreen> {
   @override
   Widget build(BuildContext context) {
     final isOwner = _currentUserId != null && widget.post.userId == _currentUserId;
+    final imageBytes = _decodeBase64Image(widget.post.image);
 
     return Scaffold(
       appBar: AppBar(
@@ -251,9 +263,9 @@ class _DetailScreenState extends State<DetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.post.image != null && widget.post.image!.isNotEmpty)
+            if (imageBytes != null)
               Image.memory(
-                base64Decode(widget.post.image!),
+                imageBytes,
                 width: double.infinity,
                 height: 250,
                 fit: BoxFit.cover,
@@ -328,7 +340,7 @@ class _DetailScreenState extends State<DetailScreen> {
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Koordinat Resto: ${widget.post.latitude}, ${widget.post.longitude}',
+                            'Koordinat Resto: ${widget.post.latitude?.toStringAsFixed(6) ?? '-'}, ${widget.post.longitude?.toStringAsFixed(6) ?? '-'}',
                             style: const TextStyle(color: Colors.grey),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -351,10 +363,198 @@ class _DetailScreenState extends State<DetailScreen> {
                       label: const Text('Lihat di Peta'),
                     ),
                   ],
+                  
+                  // --- SEKSI KOMENTAR PENGGUNA ---
+                  const SizedBox(height: 24),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  Text(
+                    "Komentar Pengguna",
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.white
+                          : Colors.black87,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  if (widget.post.id != null)
+                    StreamBuilder<QuerySnapshot>(
+                      stream: PostService.getComments(widget.post.id!),
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState == ConnectionState.waiting) {
+                          return const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(16.0),
+                              child: CircularProgressIndicator(color: Colors.deepOrange),
+                            ),
+                          );
+                        }
+
+                        if (snapshot.hasError) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Text(
+                              "Gagal memuat komentar.",
+                              style: TextStyle(color: Colors.red, fontSize: 13),
+                            ),
+                          );
+                        }
+
+                        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.all(16.0),
+                            child: Text(
+                              "Belum ada komentar.",
+                              style: TextStyle(color: Colors.grey, fontSize: 13),
+                            ),
+                          );
+                        }
+
+                        final comments = snapshot.data!.docs.take(3).toList();
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            ...List.generate(comments.length, (index) {
+                              final commentData = comments[index].data() as Map<String, dynamic>;
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(
+                                      width: 36,
+                                      height: 36,
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[300],
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.person,
+                                        color: Colors.white,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            commentData["username"] ?? "Anonim",
+                                            style: const TextStyle(
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 3),
+                                          Text(
+                                            commentData["text"] ?? "",
+                                            style: const TextStyle(
+                                              fontSize: 13,
+                                              color: Colors.grey,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }),
+                            if ((snapshot.data?.docs.length ?? 0) > 3)
+                              Center(
+                                child: TextButton(
+                                  onPressed: _showCommentBottomSheet,
+                                  child: const Text(
+                                    "Lihat semua komentar",
+                                    style: TextStyle(color: Colors.blue, fontSize: 12),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        );
+                      },
+                    )
+                  else
+                    const Padding(
+                      padding: EdgeInsets.all(16.0),
+                      child: Text(
+                        "Belum ada komentar.",
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
+                    ),
+                  const SizedBox(height: 24), 
                 ],
               ),
             ),
           ],
+        ),
+      ),
+      
+      // --- BAR INTERAKSI BAGIAN BAWAH ---
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Theme.of(context).cardColor
+                : Colors.grey[100],
+            border: Border(
+              top: BorderSide(
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Theme.of(context).dividerColor
+                    : Colors.grey[300]!,
+                width: 0.5,
+              ),
+            ),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: _showCommentBottomSheet,
+                  child: Container(
+                    height: 45,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Theme.of(context).scaffoldBackgroundColor
+                          : Colors.white,
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Theme.of(context).dividerColor
+                            : Colors.grey[300]!,
+                      ),
+                    ),
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      "Komentar anda...",
+                      style: TextStyle(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.white38
+                            : Colors.grey,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              IconButton(
+                icon: const Icon(Icons.chat_bubble_outline, color: Colors.grey),
+                onPressed: _showCommentBottomSheet,
+                constraints: const BoxConstraints(),
+                padding: EdgeInsets.zero,
+              ),
+            ],
+          ),
         ),
       ),
     );

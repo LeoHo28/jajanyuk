@@ -98,4 +98,38 @@ class PostService {
       });
     });
   }
+
+  // ==================== FITUR KOMENTAR (BARU) ====================
+
+  // 1. Menambahkan komentar baru ke sub-collection di dalam dokumen post terkait
+  static Future<void> addComment(String postId, Map<String, dynamic> commentData) async {
+    // Menambahkan timestamp otomatis dari server agar urutan komentar konsisten
+    commentData['createdAt'] = FieldValue.serverTimestamp();
+    
+    await _db
+        .collection('posts')
+        .doc(postId)
+        .collection('comments')
+        .add(commentData);
+  }
+
+  // 2. Mengambil stream daftar komentar secara real-time (diurutkan dari yang terbaru)
+  static Stream<QuerySnapshot> getComments(String postId) {
+    return _db
+        .collection('posts')
+        .doc(postId)
+        .collection('comments')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  // 3. Menghapus komentar berdasarkan ID dokumen komentar tersebut
+  static Future<void> deleteComment(String postId, String commentId) async {
+    await _db
+        .collection('posts')
+        .doc(postId)
+        .collection('comments')
+        .doc(commentId)
+        .delete();
+  }
 }

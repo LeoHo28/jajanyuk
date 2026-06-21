@@ -1,12 +1,14 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart'; // Ditambahkan untuk StreamBuilder Notifikasi
 import 'add_post_screen.dart';
 import 'favorite_screen.dart'; 
 import 'profile_screen.dart'; 
 import 'sign_in_screen.dart';
 import '../service/post_service.dart';
+import '../service/notification_service.dart'; // Ditambahkan untuk akses stream notifikasi realtime
 import '../widget/post_list_item.dart';
-
+import 'notification_screen.dart'; 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -16,6 +18,21 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    // Mengaktifkan sistem push notification lokal Android sejak aplikasi pertama kali dibuka
+    _initNotificationSystem();
+  }
+
+  Future<void> _initNotificationSystem() async {
+    try {
+      await NotificationService.initialize();
+    } catch (e) {
+      debugPrint("Gagal menginisialisasi sistem notifikasi: $e");
+    }
+  }
 
   Future<void> signOut() async {
     await FirebaseAuth.instance.signOut();
@@ -27,7 +44,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Desain Beranda Utama yang Menarik & Aman dari Overflow
+  // Desain Beranda Utama asli JajahYuk yang ditambahkan fitur Badge Notifikasi
   Widget _buildHomeDashboard() {
     final currentUserId = FirebaseAuth.instance.currentUser?.uid;
     final userName = FirebaseAuth.instance.currentUser?.displayName ?? 'Foodies';
@@ -37,38 +54,106 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Banner Sapaan Pengguna Modern
+          // Banner Sapaan Pengguna Modern Asli JajahYuk
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20.0),
+            padding: const EdgeInsets.fromLTRB(16, 50, 16, 20),
             decoration: const BoxDecoration(
               color: Colors.deepOrange,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(24),
-                bottomRight: Radius.circular(24),
-              ),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  "Halo, $userName! 👋",
-                  style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                // Bagian Teks Sapaan Asli
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Halo, $userName!',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Mau jajan kuliner apa hari ini?',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white, // Menggunakan putih transparan lembut
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  "Mau berburu kuliner apa hari ini?",
-                  style: TextStyle(fontSize: 14, color: Colors.orange.shade100),
+                
+                // === FITUR BARU: TOMBOL LONCENG & BADGE NOTIFIKASI REALTIME ===
+                GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const NotificationScreen(),
+                      ),
+                    );
+                  },
+                  child: StreamBuilder<QuerySnapshot>(
+                    stream: NotificationService.getNotificationsStream(),
+                    builder: (context, snapshot) {
+                      // Menghitung jumlah dokumen di Firestore yang field 'read' bernilai false
+                      final unreadCount = snapshot.data?.docs
+                              .where((doc) => (doc.data() as Map<String, dynamic>)['read'] == false)
+                              .length ??
+                          0;
+
+                      return Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          const Icon(
+                            Icons.notifications_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                          if (unreadCount > 0)
+                            Positioned(
+                              right: -2,
+                              top: -2,
+                              child: Container(
+                                padding: const EdgeInsets.all(2),
+                                decoration: const BoxDecoration(
+                                  color: Colors.redAccent,
+                                  shape: BoxShape.circle,
+                                ),
+                                constraints: const BoxConstraints(
+                                  minWidth: 14,
+                                  minHeight: 14,
+                                ),
+                                child: Text(
+                                  unreadCount > 9 ? '9+' : unreadCount.toString(),
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 8,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
           ),
-
-          const Padding(
-            padding: EdgeInsets.only(left: 16.0, top: 20.0, bottom: 8.0),
+          
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 8.0),
             child: Text(
-              "Penjelajahan Kuliner Terbaru",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
+              'Petualangan Kuliner Terbaru',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey.shade800),
             ),
           ),
 
@@ -82,18 +167,21 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (snapshot.hasError) {
                   return Center(child: Text('Error: ${snapshot.error}'));
                 }
+
                 final posts = snapshot.data ?? [];
+
                 if (posts.isEmpty) {
-                  return const Center(child: Text('Belum ada review kuliner.'));
+                  return const Center(
+                    child: Text('Belum ada review kuliner. Jadilah yang pertama!'),
+                  );
                 }
-                
+
                 return RefreshIndicator(
                   onRefresh: () async {
                     setState(() {});
                   },
-                  // Menggunakan ListView vertikal agar pas dengan komponen PostListItem bawaanmu
                   child: ListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 8.0),
+                    padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0),
                     itemCount: posts.length,
                     itemBuilder: (context, index) {
                       final post = posts[index];
@@ -117,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return [
       _buildHomeDashboard(),
       const FavoriteScreen(),
-      const Center(child: CircularProgressIndicator()), // Placeholder transisi
+      const SizedBox.shrink(), 
       const ProfileScreen(),
     ];
   }
@@ -125,19 +213,26 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Jajanyuk", style: TextStyle(fontWeight: FontWeight.bold)),
-        backgroundColor: Colors.deepOrange,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            onPressed: signOut,
-            icon: const Icon(Icons.logout),
-            tooltip: "Keluar",
-          ),
-        ],
-      ),
+      backgroundColor: Colors.white,
+      appBar: _currentIndex == 0 
+          ? null // AppBar bawaan disembunyikan hanya pada Dashboard Beranda agar banner custom deepOrange terlihat penuh
+          : AppBar(
+              title: Text(
+                _currentIndex == 1 ? 'Kuliner Favorit' : 'Profil Saya',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: Colors.deepOrange,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              actions: [
+                if (_currentIndex == 3)
+                  IconButton(
+                    onPressed: signOut,
+                    icon: const Icon(Icons.logout),
+                    tooltip: "Keluar",
+                  ),
+              ],
+            ),
       body: _currentIndex == 2 
           ? const Center(child: CircularProgressIndicator()) 
           : _buildBodyWidgets()[_currentIndex],

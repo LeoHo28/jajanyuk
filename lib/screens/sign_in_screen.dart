@@ -112,6 +112,16 @@ class SignInScreenState extends State<SignInScreen> {
                           builder: (context) => const HomeScreen(),
                         ),
                       );
+                    } on FirebaseAuthException catch (e) {
+                      // Tangani error Firebase secara eksplisit agar kita dapat
+                      // melihat kode error (mis. invalid-credential, wrong-password)
+                      setState(() {
+                        _errorMessage = '[${e.code}] ${e.message ?? ''}';
+                      });
+                      if (!mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(_errorMessage)),
+                      );
                     } catch (error) {
                       setState(() {
                         _errorMessage = error.toString();

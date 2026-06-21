@@ -15,10 +15,10 @@ class MapDetailScreen extends StatefulWidget {
 class _MapDetailScreenState extends State<MapDetailScreen> {
   @override
   Widget build(BuildContext context) {
-    final lat = double.tryParse(widget.post.latitude ?? '');
-    final lng = double.tryParse(widget.post.longitude ?? '');
+    final lat = widget.post.latitude;
+    final lng = widget.post.longitude;
     final hasLocation = lat != null && lng != null;
-    final point = hasLocation ? LatLng(lat, lng) : const LatLng(0, 0);
+    final point = hasLocation ? LatLng(lat!, lng!) : const LatLng(0, 0);
     return Scaffold(
       appBar: AppBar(title: Text(widget.post.category ?? 'Map Detail')),
       body: hasLocation

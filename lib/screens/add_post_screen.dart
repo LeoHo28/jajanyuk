@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import '../model/post.dart';
+import '../service/notification_service.dart';
 import '../service/post_service.dart';
 
 class AddPostScreen extends StatefulWidget {
@@ -16,8 +17,8 @@ class AddPostScreen extends StatefulWidget {
 class _AddPostScreenState extends State<AddPostScreen> {
   final TextEditingController _descriptionController = TextEditingController();
   String? _base64Image;
-  String? _latitude;
-  String? _longitude;
+  double? _latitude;
+  double? _longitude;
   String? _category;
   double _selectedRating = 5.0; 
   bool _isSubmitting = false;
@@ -74,8 +75,8 @@ class _AddPostScreenState extends State<AddPostScreen> {
       ).timeout(const Duration(seconds: 10));
 
       setState(() {
-        _latitude = position.latitude.toString();
-        _longitude = position.longitude.toString();
+        _latitude = position.latitude;
+        _longitude = position.longitude;
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -158,6 +159,13 @@ class _AddPostScreenState extends State<AddPostScreen> {
               textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.deepOrange),
             ),
+            const SizedBox(height: 12),
+            if (_latitude != null && _longitude != null)
+              Text(
+                'Lokasi: ${_latitude!.toStringAsFixed(6)}, ${_longitude!.toStringAsFixed(6)}',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey),
+              ),
             const SizedBox(height: 16),
             Card(
               color: Colors.amber.shade50,
@@ -208,7 +216,13 @@ class _AddPostScreenState extends State<AddPostScreen> {
                 setState(() => _isSubmitting = true);
                 try {
                   if (_latitude == null) await _getLocation();
-                  
+                  if (_latitude == null || _longitude == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Lokasi belum didapat. Coba lagi.')),
+                    );
+                    return;
+                  }
+
                   await PostService.addPost(Post(
                     image: _base64Image,
                     description: _descriptionController.text,
@@ -221,6 +235,10 @@ class _AddPostScreenState extends State<AddPostScreen> {
                     userFullName: FirebaseAuth.instance.currentUser?.displayName,
                     likedBy: const [],         
                   ));
+                  await NotificationService.showReviewNotification(
+                    title: 'Review terkirim',
+                    body: 'Review kuliner kamu berhasil ditambahkan.',
+                  );
                   
                   if (mounted) Navigator.pop(context);
                 } catch (e) {

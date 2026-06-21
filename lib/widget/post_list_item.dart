@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import '../model/post.dart';
 import '../screens/detail_screen.dart';
@@ -13,10 +14,20 @@ class PostListItem extends StatelessWidget {
     required this.isOwner,
   });
 
+  Uint8List? _decodeBase64Image(String? image) {
+    if (image == null || image.isEmpty) return null;
+    try {
+      return base64Decode(image);
+    } catch (_) {
+      return null;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Mengambil nilai getter rata-rata rating dari model Post
     double foodRating = post.averageRating;
+    final imageBytes = _decodeBase64Image(post.image);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -35,7 +46,7 @@ class PostListItem extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (post.image != null && post.image!.isNotEmpty)
+            if (imageBytes != null)
               Stack(
                 children: [
                   ClipRRect(
@@ -44,7 +55,7 @@ class PostListItem extends StatelessWidget {
                       topRight: Radius.circular(16),
                     ),
                     child: Image.memory(
-                      base64Decode(post.image!),
+                      imageBytes,
                       height: 180,
                       width: double.infinity,
                       fit: BoxFit.cover,
